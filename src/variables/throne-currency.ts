@@ -1,4 +1,4 @@
-import type { ReplaceVariable } from "@crowbartools/firebot-custom-scripts-types/types/modules/replace-variable-manager";
+import type { ReplaceVariable } from "@crowbartools/firebot-types";
 import type { ThroneEventData } from "../throne-types";
 import {
     VARIABLE_PREFIX,
@@ -12,8 +12,8 @@ export const ThroneCurrencyVariable: ReplaceVariable = {
     definition: {
         handle: `${VARIABLE_PREFIX}Currency`,
         description: "The currency of the Throne transaction (e.g. USD).",
-        possibleDataOutput: [ "text" ],
-        categories: [ "trigger based", "text" ],
+        possibleDataOutput: ["text"],
+        categories: ["trigger based", "text"],
         triggers: {
             event: [
                 `${EVENT_SOURCE_ID}:${CONTRIBUTION_PURCHASED_EVENT_ID}`,

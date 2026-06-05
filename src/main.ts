@@ -1,5 +1,4 @@
-import type { Firebot, ScriptModules } from "@crowbartools/firebot-custom-scripts-types";
-import type { WebhookConfig } from "@crowbartools/firebot-custom-scripts-types/types/modules/webhook-manager";
+import firebot, { Plugin } from "@crowbartools/firebot-types";
 import type {
     ThronePayload,
     ThroneEventData
@@ -16,198 +15,126 @@ import {
 
 import { ThroneEventSource } from "./events";
 import { ThroneVariables } from "./variables";
+import { ScriptWebhookEventHandler } from "@crowbartools/firebot-types/types/script-api";
 
 const packageInfo = require("../package.json");
 
-let logger: ScriptModules["logger"];
-let eventManager: ScriptModules["eventManager"];
-let replaceVariableManager: ScriptModules["replaceVariableManager"];
-let webhookManager: ScriptModules["webhookManager"];
-let frontendCommunicator: ScriptModules["frontendCommunicator"];
+const processWebhook: ScriptWebhookEventHandler = ({ webhook, payload }) => {
+    const thronePayload = payload as ThronePayload;
 
-let copyWebhookUrlEventId: string = undefined;
-
-const logDebug = (msg: string, ...meta: any[]) => logger.debug(`[${PLUGIN_NAME}] ${msg}`, ...meta);
-const logInfo = (msg: string, ...meta: any[]) => logger.info(`[${PLUGIN_NAME}] ${msg}`, ...meta);
-const logWarn = (msg: string, ...meta: any[]) => logger.warn(`[${PLUGIN_NAME}] ${msg}`, ...meta);
-const logError = (msg: string, ...meta: any[]) => logger.error(`[${PLUGIN_NAME}] ${msg}`, ...meta);
-
-const processWebhook = ({ config, payload }: { config: WebhookConfig, payload: ThronePayload }) => {
-    logDebug(`Got webhook for ${config.name}`);
-    if (config.name !== PLUGIN_NAME) {
-        logDebug(`Received unknown webhook event for ${config.name}. Ignoring.`);
+    firebot.logger.debug(`Got webhook for ${webhook.name}`);
+    if (webhook.name !== PLUGIN_NAME) {
+        firebot.logger.debug(`Received unknown webhook event for ${webhook.name}. Ignoring.`);
         return;
     }
 
     let eventName: string, eventData: ThroneEventData;
     let baseEventData = {
-        contractVersion: payload.contract_version,
-        eventId: payload.event_id
+        contractVersion: thronePayload.contract_version,
+        eventId: thronePayload.event_id
     };
 
-    logDebug(`Webhook type: ${payload.event_type}`);
+    firebot.logger.debug(`Webhook type: ${thronePayload.event_type}`);
 
-    switch (payload.event_type) {
+    switch (thronePayload.event_type) {
         case "contribution_purchased":
             eventName = CONTRIBUTION_PURCHASED_EVENT_ID;
             eventData = {
-                eventType: payload.event_type,
+                eventType: thronePayload.event_type,
                 ...baseEventData,
-                creatorId: payload.data.creator_id,
-                creatorUsername: payload.data.creator_username,
-                gifterUsername: payload.data.gifter_username,
-                message: payload.data.message,
-                itemName: payload.data.item_name,
-                itemThumbnailUrl: payload.data.item_thumbnail_url,
-                amount: payload.data.amount,
-                currency: payload.data.currency
+                creatorId: thronePayload.data.creator_id,
+                creatorUsername: thronePayload.data.creator_username,
+                gifterUsername: thronePayload.data.gifter_username,
+                message: thronePayload.data.message,
+                itemName: thronePayload.data.item_name,
+                itemThumbnailUrl: thronePayload.data.item_thumbnail_url,
+                amount: thronePayload.data.amount,
+                currency: thronePayload.data.currency
             };
             break;
-            
+
         case "gift_crowdfunded":
             eventName = GIFT_CROWDFUNDED_EVENT_ID;
             eventData = {
-                eventType: payload.event_type,
+                eventType: thronePayload.event_type,
                 ...baseEventData,
-                creatorId: payload.data.creator_id,
-                creatorUsername: payload.data.creator_username,
-                itemName: payload.data.item_name,
-                itemThumbnailUrl: payload.data.item_thumbnail_url,
-                price: payload.data.price,
-                currency: payload.data.currency,
-                isSurpriseGift: payload.data.is_surprise_gift
+                creatorId: thronePayload.data.creator_id,
+                creatorUsername: thronePayload.data.creator_username,
+                itemName: thronePayload.data.item_name,
+                itemThumbnailUrl: thronePayload.data.item_thumbnail_url,
+                price: thronePayload.data.price,
+                currency: thronePayload.data.currency,
+                isSurpriseGift: thronePayload.data.is_surprise_gift
             };
             break;
-            
+
         case "gift_purchased":
             eventName = GIFT_PURCHASED_EVENT_ID;
             eventData = {
-                eventType: payload.event_type,
+                eventType: thronePayload.event_type,
                 ...baseEventData,
-                creatorId: payload.data.creator_id,
-                creatorUsername: payload.data.creator_username,
-                gifterUsername: payload.data.gifter_username,
-                message: payload.data.message,
-                itemName: payload.data.item_name,
-                itemThumbnailUrl: payload.data.item_thumbnail_url,
-                price: payload.data.price,
-                currency: payload.data.currency,
-                isSurpriseGift: payload.data.is_surprise_gift
+                creatorId: thronePayload.data.creator_id,
+                creatorUsername: thronePayload.data.creator_username,
+                gifterUsername: thronePayload.data.gifter_username,
+                message: thronePayload.data.message,
+                itemName: thronePayload.data.item_name,
+                itemThumbnailUrl: thronePayload.data.item_thumbnail_url,
+                price: thronePayload.data.price,
+                currency: thronePayload.data.currency,
+                isSurpriseGift: thronePayload.data.is_surprise_gift
             };
             break;
 
         default:
-            logDebug(`Unknown event type ${(payload as any).event_type}`);
+            firebot.logger.debug(`Unknown event type ${(payload as any).event_type}`);
             return;
     }
 
-    logDebug(`Triggering event ${eventName}`);
-    eventManager.triggerEvent(EVENT_SOURCE_ID, eventName, eventData);
+    firebot.logger.debug(`Triggering event ${eventName}`);
+    firebot.events.trigger(EVENT_SOURCE_ID, eventName, eventData);
 };
 
-const script: Firebot.CustomScript<{
+const plugin: Plugin<{
     copyWebhookUrl: void;
 }> = {
-    getScriptManifest: () => {
-        return {
-            name: PLUGIN_NAME,
-            description: packageInfo.description,
-            author: packageInfo.author,
-            version: packageInfo.version,
-            firebotVersion: "5",
-            startupOnly: true,
-            initBeforeShowingParams: true
-        };
+    manifest: {
+        type: "plugin",
+        icon: "fa-crown",
+        name: PLUGIN_NAME,
+        description: packageInfo.description,
+        author: packageInfo.author,
+        version: packageInfo.version,
+        repo: "https://github.com/zunderscore/firebot-plugin-throne",
+        minimumFirebotVersion: { major: 5, minor: 67 },
+        initBeforeShowingParams: true,
     },
-    getDefaultParameters: () => ({
-        copyWebhookUrl: {
+    parametersSchema: [
+        {
+            name: "copyWebhookUrl",
             type: "button",
             title: "Webhook URL",
             description: "Copy this URL and add it to the **Subscriber URLs** list in your Throne account under Integrations > Webhooks.",
             backendEventName: `${PLUGIN_ID}:copy-webhook-url`,
-            buttonText: "Copy URL",
-            icon: "fa-copy",
-            sync: true
+            buttonText: "Copy Webhook URL"
         }
-    }),
-    run: ({ modules }) => {
-        ({
-            logger,
-            eventManager,
-            frontendCommunicator,
-            replaceVariableManager,
-            webhookManager
-        } = modules);
-
-        logInfo(`Starting ${PLUGIN_NAME} plugin...`);
-
-        if (webhookManager == null) {
-            logError(`Cannot start ${PLUGIN_NAME} plugin. You must be on Firebot 5.65 or higher.`);
-            return;
+    ],
+    registers: {
+        eventSources: [ThroneEventSource],
+        variables: ThroneVariables,
+        webhooks: {
+            handler: processWebhook,
+            webhookNames: [
+                PLUGIN_NAME
+            ]
         }
-
-        logDebug("Registering events...");
-        eventManager.registerEventSource(ThroneEventSource);
-
-        logDebug("Registering variables...");
-        for (const variable of ThroneVariables) {
-            replaceVariableManager.registerReplaceVariable(variable);
-        }
-
-        logDebug("Registering frontend listener");
-        copyWebhookUrlEventId = frontendCommunicator.on(`${PLUGIN_ID}:copy-webhook-url`, () => {
-            frontendCommunicator.send("copy-to-clipboard", { 
-                text: webhookManager.getWebhookUrl(PLUGIN_NAME),
+    },
+    onLoad: () => {
+        firebot.frontendCommunicator.on(`${PLUGIN_ID}:copy-webhook-url`, () => {
+            firebot.frontendCommunicator.send("copy-to-clipboard", {
+                text: firebot.webhooks.getUrl(PLUGIN_NAME),
             });
         });
-
-        logDebug("Registering webhook listener...");
-        webhookManager.on("webhook-received", processWebhook);
-
-        logDebug("Checking for webhook...");
-        let webhook = webhookManager.getWebhook(PLUGIN_NAME);
-
-        if (webhook == null) {
-            logDebug("Webhook not found. Registering...");
-
-            webhook = webhookManager.saveWebhook(PLUGIN_NAME);
-        }
-
-        if (webhook == null) {
-            logError("Something went wrong while registering webhook. Exiting.");
-            return;
-        }
-
-        logDebug("Webhook registered");
-        logInfo("Plugin ready. Listening for events.");
-    },
-    stop: (uninstalling: boolean) => {
-        logDebug(`Stopping ${PLUGIN_NAME} plugin`);
-
-        logDebug("Stopping webhook listener");
-        webhookManager.removeListener("webhook-received", processWebhook);
-
-        logDebug("Unregistering frontend listener");
-        frontendCommunicator.off(`${PLUGIN_ID}:copy-webhook-url`, copyWebhookUrlEventId);
-        
-        logDebug("Unregistering variables...");
-        for (const variable of ThroneVariables) {
-            replaceVariableManager.unregisterReplaceVariable(variable.definition.handle);
-        }
-        
-        logDebug("Unregistering events...");
-        eventManager.unregisterEventSource(PLUGIN_ID);
-
-        if (uninstalling === true) {
-            logDebug("Removing webhook...");
-
-            webhookManager.deleteWebhook(PLUGIN_NAME);
-
-            logInfo("Plugin uninstalled");
-        } else {
-            logInfo("Plugin stopped");
-        }
     }
-};
+}
 
-export default script;
+export default plugin;
