@@ -1,4 +1,4 @@
-import firebot, { Plugin } from "@crowbartools/firebot-types";
+import firebot, { Plugin, PluginWebhookEventHandler } from "@crowbartools/firebot-types";
 import type {
     ThronePayload,
     ThroneEventData
@@ -15,11 +15,10 @@ import {
 
 import { ThroneEventSource } from "./events";
 import { ThroneVariables } from "./variables";
-import { ScriptWebhookEventHandler } from "@crowbartools/firebot-types/types/script-api";
 
 const packageInfo = require("../package.json");
 
-const processWebhook: ScriptWebhookEventHandler = ({ webhook, payload }) => {
+const processWebhook: PluginWebhookEventHandler = ({ webhook, payload }) => {
     const thronePayload = payload as ThronePayload;
 
     firebot.logger.debug(`Got webhook for ${webhook.name}`);
