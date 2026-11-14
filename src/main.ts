@@ -106,9 +106,9 @@ const plugin: Plugin<{
         description: packageInfo.description,
         author: packageInfo.author,
         version: packageInfo.version,
+        website: "https://throne.com",
         repo: "https://github.com/zunderscore/firebot-plugin-throne",
-        minimumFirebotVersion: { major: 5, minor: 67 },
-        initBeforeShowingParams: true,
+        minimumFirebotVersion: { major: 5, minor: 67 }
     },
     parametersSchema: [
         {
